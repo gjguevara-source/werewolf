@@ -3,256 +3,207 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Inquisitor: Red Moon Town — Twine‑Lite</title>
+<title>Inquisitor: Red Moon Town — Twine Edition</title>
 <style>
-  :root{--bg:#0b0f14;--panel:#141b26;--muted:#9fb1c6;--fg:#e8edf3;--accent:#8ab4f8;--danger:#ff6b6b}
+  :root{color-scheme:dark;--bg:#0b0f14;--card:#141b26;--fg:#e8edf3;--accent:#8ab4f8;--border:#1f2d3d}
   *{box-sizing:border-box}
-  body{margin:0;background:#0a0f16;color:var(--fg);font:16px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial}
-  header{padding:12px 16px;border-bottom:1px solid #1f2a35;background:#0c1119;position:sticky;top:0;z-index:2}
-  header h1{margin:0;font-size:18px}
-  main{max-width:860px;margin:0 auto;padding:12px;display:grid;gap:12px}
-  .card{background:var(--panel);border:1px solid #223149;border-radius:14px;box-shadow:0 10px 30px #0005}
-  .pad{padding:12px}
-  .small{font-size:12px;color:#b7c6da}
-  .log{white-space:pre-wrap;font-family:ui-monospace,Consolas,Menlo,monospace;max-height:52dvh;overflow:auto}
-  .choices{display:flex;flex-wrap:wrap;gap:8px}
-  .choice{background:#101827;border:1px solid #2a3c58;border-radius:10px;padding:8px 12px;color:#e8edf3;cursor:pointer}
-  .choice:hover{border-color:#3e557a}
-  .inline-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-  .inline-list .choice{padding:6px 10px}
-  .pill{display:inline-block;padding:3px 8px;border:1px solid #2b3f5e;border-radius:999px;color:#cfe0f6;font-size:12px}
-  .hr{height:1px;background:#223149;margin:8px 0}
+  body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 "Segoe UI",system-ui,sans-serif;display:flex;justify-content:center}
+  main{max-width:720px;width:100%;padding:24px}
+  h1{font-size:22px;margin:0 0 16px;text-align:center;letter-spacing:0.03em}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:0 22px 46px #0006}
+  #story{display:flex;flex-direction:column;gap:14px;margin-bottom:24px;min-height:180px}
+  #story p{margin:0}
+  .choices{display:flex;flex-direction:column;gap:10px}
+  button{appearance:none;border-radius:999px;border:1px solid var(--border);background:#0f1826;color:var(--fg);padding:10px 18px;font:inherit;cursor:pointer;text-align:left;transition:background 160ms}
+  button:hover{background:#122135}
+  button:disabled{opacity:0.5;cursor:default}
+  .small{font-size:13px;color:#b5c7df;text-align:center;margin-top:18px}
 </style>
 </head>
 <body>
-<header><h1>Inquisitor: Red Moon Town — Twine‑Lite</h1></header>
-<main>
-  <section class="card pad">
-    <div class="small" id="status">
-      <span class="pill">Day <span id="day">1</span></span>
-      <span class="pill">Alive: <span id="alive">18</span></span>
-      <label class="small" style="margin-left:8px"><input type="checkbox" id="forceLore"> Force lore (Innkeeper is wolf)</label>
+  <main>
+    <div class="card">
+      <h1>Inquisitor: Red Moon Town</h1>
+      <div id="story"></div>
+      <div id="choiceRoot" class="choices"></div>
+      <div class="small">
+        <button id="restart">Restart the tale</button>
+      </div>
     </div>
-    <div class="hr"></div>
-    <div id="passage" class="small">You arrive under a pallid sky. A killer stalks the town. Each day you may <b>talk to one person</b> and optionally issue <b>one order</b>. If you do nothing, the night still comes. Click a choice to continue.</div>
-    <div class="hr"></div>
-    <div id="choiceRoot" class="choices"></div>
-    <div id="subChoices" class="inline-list"></div>
-  </section>
-
-  <section class="card pad">
-    <div class="small" style="margin-bottom:6px">Story Log</div>
-    <div id="log" class="log"></div>
-  </section>
-</main>
+  </main>
 <script>
 (function(){
-  // ---------- Data ----------
-  const ROLES=[
-    {id:1,name:'Butcher',talk:"Been disposing of heads; rumors say the sickness spreads that way.",type:'civ'},
-    {id:2,name:'Red Lady',talk:"I visit where the moon points — perhaps your suspect tonight.",type:'special'},
-    {id:3,name:'Witch',talk:"The werewolf curse is only a symptom; a rival witch feeds it from afar.",type:'special'},
-    {id:4,name:'Baker',talk:"Bread solves nerves! Who needs panic when you’ve got loaves?",type:'civ'},
-    {id:5,name:'Blacksmith',talk:"Iron everywhere. I can plate a man faster than the moon can rise.",type:'special'},
-    {id:6,name:'Sleuth',talk:"Details whisper. The calm baker… fascinating.",type:'special'},
-    {id:7,name:'Lumberjack',talk:"Saw a den by the old mill. I can rig traps.",type:'special'},
-    {id:8,name:'Mayor',talk:"I keep order. Do what you must, Inquisitor.",type:'plot'},
-    {id:9,name:'Jailer',talk:"Say the word. I’ll lock any of them up.",type:'special'},
-    {id:10,name:'Torturer',talk:"Truth has a price. I collect.",type:'special'},
-    {id:11,name:'Seamstress',talk:"The fabric I found is middle‑class — not noble, not poor.",type:'plot'},
-    {id:12,name:'Librarian',talk:"History repeats when ignored. The orphan is safe with me.",type:'civ'},
-    {id:13,name:'Innkeeper',talk:"Busy night. Rooms full, rumors fuller.",type:'special'},
-    {id:14,name:'Doctor',talk:"I’ll do my best to keep someone breathing.",type:'special'},
-    {id:15,name:'Scientist',talk:"I can cure this, with… reluctant help from the Witch.",type:'special'},
-    {id:16,name:'Thug',talk:"Coin buys silence. And accidents.",type:'plot'},
-    {id:17,name:'Orphan',talk:"I saw teeth below the tavern.",type:'special'},
-    {id:18,name:'Fool',talk:"HAHA! Madweed for all! (Don’t pop my head.)",type:'trap'}
-  ];
+  const storyEl=document.getElementById('story');
+  const choiceEl=document.getElementById('choiceRoot');
+  const restartBtn=document.getElementById('restart');
 
-  // ---------- State ----------
-  const S={
-    day:1, alive:new Set(ROLES.map(r=>r.id)), dead:new Set(),
-    talked:false, order:null, orderTarget:null,
-    jailed:null, shield:null, doctor:null,
-    redLadyHost:null, sleuthTarget:null,
-    wolf:null, hearts:0, rootClue:false,
-    orphanGone:false, lastCorpse:null
+  const state={};
+
+  const PASSAGES={
+    start:{
+      text:"A red moon crowns the town. As royal inquisitor you must uncover the werewolf before nightfall.",
+      choices:[
+        {label:"Enter the crescent-timber inn",next:"innEntry"},
+        {label:"Inspect the market square",next:"square"},
+        {label:"Lurk on the rooftops and watch",next:"rooftop"}
+      ]
+    },
+    innEntry:{
+      text:s=>s.hasProof?"Innkeeper Garran polishes a glass, eyes darting to the trapdoor. He knows you carry proof." :"Innkeeper Garran greets you with a forced smile. Rumors say his cellars never close.",
+      choices:[
+        {label:"Press Garran with what you know", next:s=>s.hasProof?"accuse" : "noProof"},
+        {label:"Slip behind the counter toward the trapdoor", next:s=>s.hasLantern?"cellar" : "darkCellar"},
+        {label:"Return to the square", next:"square"}
+      ]
+    },
+    square:{
+      text:s=>{
+        if(!s.visitedSquare){
+          s.visitedSquare=true;
+          return "The square sits hushed. Merchants whisper of disappearances. Two figures remain brave enough to meet your eye.";
+        }
+        return "Stalls creak under the moon's pull. The seamstress and blacksmith await your decision.";
+      },
+      choices:[
+        {label:"Question the seamstress",next:"seamstress",condition:s=>!s.heardSeamstress},
+        {label:"Consult the blacksmith",next:"blacksmith",condition:s=>!s.hasLantern},
+        {label:"Head back to the inn",next:"innEntry"},
+        {label:"Wait here for nightfall",next:"nightfall"}
+      ]
+    },
+    rooftop:{
+      text:"Hours pass as you watch chimneys breathe mist. Without a plan the moon outpaces you.",
+      choices:[
+        {label:"Drop to the street and decide quickly",next:"square"},
+        {label:"Keep waiting",next:"nightfall"}
+      ]
+    },
+    seamstress:{
+      text:s=>{
+        s.heardSeamstress=true;
+        s.hasProof=true;
+        return "The seamstress clutches a torn sleeve. \"This cloth is from Garran's private stock, stained with blood.\"";
+      },
+      choices:[
+        {label:"Thank her and return to the inn",next:"innEntry"},
+        {label:"Seek more aid",next:"square"}
+      ]
+    },
+    blacksmith:{
+      text:s=>{
+        s.hasLantern=true;
+        return "The blacksmith thrusts a lantern into your hands. \"Cellars under the inn run deep. Take this.\"";
+      },
+      choices:[
+        {label:"Hurry to the inn cellar",next:"cellar"},
+        {label:"Circle back to the square",next:"square"}
+      ]
+    },
+    darkCellar:{
+      text:"You crack the trapdoor, swallowed by pitch-black steps. Without light the darkness laughs you back out.",
+      choices:[
+        {label:"Retreat for supplies",next:"square"},
+        {label:"Confront Garran anyway",next:"noProof"}
+      ]
+    },
+    cellar:{
+      text:s=>{
+        s.foundAltar=true;
+        return "Lantern raised, you find a blood-slick altar and wolf pelts drying on hooks. The truth can no longer hide.";
+      },
+      choices:[
+        {label:"Storm upstairs to accuse Garran",next:"accuse"},
+        {label:"Seal the cellar and wait",next:"nightfall"}
+      ]
+    },
+    noProof:{
+      text:"You accuse Garran but your words are hollow. Patrons laugh, Garran grins, and the moon keeps climbing.",
+      choices:[
+        {label:"Regroup elsewhere",next:"square"},
+        {label:"Let night fall",next:"nightfall"}
+      ]
+    },
+    accuse:{
+      text:s=>{
+        if(s.hasProof && s.foundAltar){
+          return "You slam the cellar door open, revealing the altar. Garran's bones twist and the beast howls — too late. Your blade, readied, ends him before the moon drinks more blood.";
+        }
+        if(s.hasProof){
+          return "You reveal the bloodied sleeve. Garran stumbles, claws pushing through his skin. With villagers watching, you strike first and the werewolf collapses.";
+        }
+        return "You shout Garran's guilt. Without evidence, he only smiles.";
+      },
+      choices:s=>{
+        if(s.hasProof){
+          return [{label:"Breathe as dawn breaks",next:"victory"}];
+        }
+        return [{label:"Try again",next:"square"}];
+      }
+    },
+    nightfall:{
+      text:"Night swallows Red Moon Town. The werewolf hunts freely, and by dawn the cobbles run red.",
+      end:"defeat"
+    },
+    victory:{
+      text:"Dawn cracks the horizon. Villagers gather around the slain beast, whispering thanks as the red moon fades.",
+      end:"victory"
+    }
   };
 
-  // ---------- Helpers ----------
-  const el=id=>document.getElementById(id);
-  const log=(m)=>{ el('log').innerHTML += m+"\n"; el('log').scrollTop = el('log').scrollHeight; };
-  const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
-  const nameOf=(id)=>ROLES.find(r=>r.id===id)?.name||'Unknown';
-
-  function init(){
-    S.day=1; S.alive=new Set(ROLES.map(r=>r.id)); S.dead=new Set();
-    S.talked=false; S.order=null; S.orderTarget=null; S.jailed=null; S.shield=null; S.doctor=null;
-    S.redLadyHost=null; S.sleuthTarget=null;
-    S.hearts=0; S.rootClue=false; S.orphanGone=false; S.lastCorpse=null;
-    S.wolf = el('forceLore').checked ? 13 : pick(ROLES.map(r=>r.id));
-    renderPassage();
-    log('You arrive in Red Moon Town. A killer stalks the streets.');
+  function reset(){
+    for(const key of Object.keys(state)) delete state[key];
+    storyEl.innerHTML='';
+    advance('start');
   }
 
-  // ---------- UI (Twine‑lite) ----------
-  function renderPassage(){
-    el('day').textContent=S.day; el('alive').textContent=[...S.alive].length;
-
-    // Top‑level choices
-    const root=el('choiceRoot'); const sub=el('subChoices'); root.innerHTML=''; sub.innerHTML='';
-
-    addChoice(root,'Talk to someone',()=> showPeople('talk'));
-    addChoice(root,'Issue an order (optional)',()=> showOrderMenu());
-    addChoice(root,'Let night fall',()=> autoNight());
-    addChoice(root,'Restart',()=> init());
+  function advance(id){
+    const passage=PASSAGES[id];
+    if(!passage) return;
+    const text=typeof passage.text==='function'?passage.text(state):passage.text;
+    addLine(text);
+    renderChoices(passage);
   }
 
-  function addChoice(container,label,fn){
-    const b=document.createElement('button'); b.className='choice'; b.textContent=label; b.onclick=fn; container.appendChild(b);
+  function addLine(text){
+    const p=document.createElement('p');
+    p.textContent=text;
+    storyEl.appendChild(p);
+    storyEl.scrollTop=storyEl.scrollHeight;
   }
 
-  function showPeople(mode){
-    const sub=el('subChoices'); sub.innerHTML='';
-    for(const id of [...S.alive]){
-      const b=document.createElement('button'); b.className='choice'; b.textContent=nameOf(id);
-      b.onclick=()=>{ if(mode==='talk') doTalk(id); else pickOrderTarget(id); };
-      sub.appendChild(b);
+  function renderChoices(passage){
+    choiceEl.innerHTML='';
+    if(passage.end){
+      const msg=passage.end==='victory'?"Victory" : "Defeat";
+      addLine(msg+": your tale in Red Moon Town is complete.");
+      const btn=document.createElement('button');
+      btn.textContent='Restart';
+      btn.onclick=reset;
+      choiceEl.appendChild(btn);
+      return;
     }
-    if(mode!=='talk'){ const note=document.createElement('div'); note.className='small'; note.textContent='Pick a target.'; sub.appendChild(note); }
-  }
-
-  function doTalk(id){
-    if(S.talked){ log('You already spoke today.'); return; }
-    if(!S.alive.has(id)){ log('They are unavailable.'); return; }
-    S.talked=true; const r=ROLES.find(x=>x.id===id);
-    if(id===13 && S.wolf===13 && Math.random()<0.7){ log('Innkeeper dodges your questions with busywork. Very evasive.'); }
-    else if(id===17 && Math.random()<0.7){ log('Orphan whispers: "Teeth below the tavern. A trapdoor drinks moonlight."'); }
-    else if(id===3){ log('Witch: Jail & torture the true wolf and they will name the rival witch.'); }
-    else if(id===11){ log('Seamstress: The cloth was middle‑class. She seems anxious.'); }
-    else { log(`[Talk] ${r.name}: ${r.talk}`); }
-  }
-
-  function showOrderMenu(){
-    const sub=el('subChoices'); sub.innerHTML='';
-    const orders=[
-      ['Execute someone', ()=>{ S.order='execute'; showPeople('order'); }],
-      ['Jail someone',    ()=>{ S.order='jail'; showPeople('order'); }],
-      ['Protect someone (Doctor)', ()=>{ S.order='protect'; showPeople('order'); }],
-      ['Pass (no order)', ()=>{ S.order=null; S.orderTarget=null; log('You give no orders.'); }]
-    ];
-    for(const [label,fn] of orders){ addChoice(sub,label,fn); }
-  }
-
-  function pickOrderTarget(id){
-    if(!S.order){ log('Pick an order first.'); return; }
-    if(!S.alive.has(id)){ log('Target must be alive.'); return; }
-    S.orderTarget=id; log(`Order set: ${S.order.toUpperCase()} → ${nameOf(id)}`);
-  }
-
-  // ---------- Night & Dawn ----------
-  function autoNight(){
-    // Evening: resolve order immediately
-    if(S.order==='execute' && S.orderTarget){
-      if(S.orderTarget===18){ lose('You executed the Fool. His madweed head explodes; the town descends into psychosis.'); return; }
-      kill(S.orderTarget,`You execute ${nameOf(S.orderTarget)}.`);
-      if(S.orderTarget===S.wolf){ win(`${nameOf(S.orderTarget)} was the Werewolf.`); return; }
+    const choices=typeof passage.choices==='function'?passage.choices(state):passage.choices;
+    if(!choices||!choices.length){
+      const btn=document.createElement('button');
+      btn.textContent='Continue';
+      btn.onclick=()=>advance('start');
+      choiceEl.appendChild(btn);
+      return;
     }
-    if(S.order==='jail' && S.orderTarget){ S.jailed=S.orderTarget; log(`${nameOf(S.jailed)} is jailed for the night (cannot die).`); }
-    if(S.order==='protect' && S.orderTarget){ S.doctor=S.orderTarget; log(`Doctor watches over ${nameOf(S.doctor)} (protects everything).`); }
-
-    // Passive effects (simplified)
-    S.redLadyHost = S.alive.has(2) ? pick([...S.alive].filter(x=>x!==2)) : null;
-    S.sleuthTarget = S.alive.has(6) ? pick([...S.alive].filter(x=>x!==6)) : null;
-
-    // Plot: Seamstress dies on Night of Day 3 unless Mayor/Thug dead; else elopes
-    if(S.day===3 && S.alive.has(11)){
-      if(S.alive.has(16)) queuedKill(11,'The Thug murders the Seamstress, posing as the beast.');
-      else if(S.alive.has(8)) queuedKill(11,'The Mayor, cornered, kills the Seamstress.');
-      else { log('Whispers: the Seamstress elopes with the Lumberjack and flees the town.'); S.alive.delete(11); }
+    for(const choice of choices){
+      if(choice.condition && !choice.condition(state)) continue;
+      const btn=document.createElement('button');
+      btn.textContent=choice.label;
+      btn.onclick=()=>{
+        const next=typeof choice.next==='function'?choice.next(state):choice.next;
+        advance(next);
+      };
+      choiceEl.appendChild(btn);
     }
-
-    // Wolf attack(s)
-    const kills = (S.day>=3? 2:1);
-    const targets=[]; const used=new Set();
-    for(let i=0;i<kills;i++){
-      const pool=[...S.alive].filter(x=>x!==S.wolf && x!==S.jailed && !used.has(x));
-      if(pool.length){ const t=pick(pool); targets.push(t); used.add(t); }
-    }
-
-    const deaths=[];
-    // Apply protection rules: jailed/protected block ALL sources
-    const isBlocked=(id)=> !!id && (id===S.jailed || id===S.doctor);
-
-    // Wolf → targets
-    for(const t of targets){
-      if(isBlocked(t)){ log(`${nameOf(t)} survives a midnight threat.`); continue; }
-      deaths.push({id:t,why:`${nameOf(t)} is torn apart by the Werewolf.`});
-    }
-
-    // Passive Sleuth risk: if her target dies, she also dies unless blocked
-    if(S.alive.has(6) && S.sleuthTarget && deaths.some(d=>d.id===S.sleuthTarget)){
-      if(isBlocked(6)) log('Sleuth would have died following her lead, but survives due to protection/jail.');
-      else deaths.push({id:6,why:'The Sleuth dies in the crossfire of her own investigation.'});
-    }
-
-    // Passive Red Lady collateral: if her host dies, she dies unless blocked
-    if(S.alive.has(2) && S.redLadyHost && deaths.some(d=>d.id===S.redLadyHost)){
-      if(isBlocked(2)) log('The Red Lady would have perished with her host, but survives due to protection/jail.');
-      else deaths.push({id:2,why:`The Red Lady dies with ${nameOf(S.redLadyHost)}.`});
-    }
-
-    // Apply queued plot kills, honoring protection rules
-    for(const q of _queued){
-      if(isBlocked(q.id)) { log(`${nameOf(q.id)} survives an assassination attempt.`); }
-      else { deaths.push(q); }
-    } _queued.length=0;
-
-    // Apply deaths
-    for(const d of deaths){ kill(d.id,d.why); }
-
-    // Clear nightly orders and advance day automatically
-    S.jailed=null; S.doctor=null; S.order=null; S.orderTarget=null; S.talked=false;
-
-    // Orphan leaves if Librarian died
-    if(!S.orphanGone && !S.alive.has(12) && S.alive.has(17)){ log('The Orphan vanishes into the woods in grief.'); S.alive.delete(17); S.orphanGone=true; }
-
-    // Lose condition: population collapse
-    if(([...S.alive].length)<=3){ lose('With so few survivors, the town collapses.'); return; }
-
-    S.day++; renderPassage(); log(`──────── Dawn of Day ${S.day}`);
   }
 
-  // ---------- Core helpers ----------
-  const _queued=[]; function queuedKill(id,why){ _queued.push({id,why}); }
-  function kill(id,why){ if(!S.alive.has(id)) return; S.alive.delete(id); S.dead.add(id); S.lastCorpse=id; log(why); }
-  function win(msg){ log("\n✅ Victory: "+msg); freeze(); }
-  function lose(msg){ log("\n❌ Defeat: "+msg); freeze(); }
-  function freeze(){
-    el('choiceRoot').innerHTML='';
-    el('subChoices').innerHTML='';
-  }
-
-  // --------------- Minimal tests ---------------
-  function runTests(){
-    try{
-      init();
-      if(nameOf(13)!=='Innkeeper') throw new Error('nameOf failed');
-      // Talking should set talked
-      const before=S.talked; doTalk(1); if(!(before===false && S.talked===true)) throw new Error('talk flag');
-      // Auto night should advance day even with no order
-      const d0=S.day; autoNight(); if(S.day!==d0+1) throw new Error('autoNight advance');
-      // Jail protects from all sources (simulate Day 3 plot)
-      init(); S.day=3; S.order='jail'; S.orderTarget=11; autoNight(); if(S.dead.has(11)) throw new Error('jailed still died');
-      // Protect protects from all sources (simulate Day 3 plot)
-      init(); S.day=3; S.order='protect'; S.orderTarget=11; autoNight(); if(S.dead.has(11)) throw new Error('protected still died');
-      log('[TEST] Sanity checks passed.');
-    }catch(e){ log('[TEST] FAIL: '+e.message); }
-  }
-
-  // Go!
-  init();
-  runTests();
+  restartBtn.onclick=reset;
+  reset();
 })();
 </script>
 </body>
